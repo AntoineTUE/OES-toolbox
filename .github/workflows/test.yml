@@ -1,0 +1,38 @@
+name: test
+
+on:
+  push:
+  pull_request_target:
+    branches: [main]
+
+concurrency:
+  group: test-${{ github.head_ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHONUNBUFFERED: "1"
+  FORCE_COLOR: "1"
+
+jobs:
+  run:
+    name: Python ${{ matrix.python-version }}
+    runs-on: "ubuntu-latest"
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.10', '3.11','3.12','3.13']
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up uv
+      uses: astral-sh/setup-uv@v6
+      with:
+        version: "latest"
+        enable-cache: true
+
+    - name: Install Hatch
+      run: uv pip install --upgrade --system hatch
+
+    - name: Run tests
+      run: hatch test --python ${{ matrix.python-version }}

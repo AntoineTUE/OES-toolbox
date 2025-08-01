@@ -76,7 +76,7 @@ class TestSupportedFiles:
 
         def test_read_avantes_raw8(self,Avantes_raw8_demo_file):
             """Read a file created with AvaSoft 8 with a 'virtual demo spectrometer' (e.g. with no physical device attached.)"""
-            data = FileLoader.read_avantes_raw8(Path("./tests/test_files/Avasoft8_demo.raw8"))
+            data = FileLoader.read_avantes_raw8(Path("./tests/test_files/avasoft8_demo.RAW8"))
             assert data.shape == (1615,4)
             assert list(data.columns) == ['wl', 'scope', 'dark', 'ref']
             assert_frame_equal(data,Avantes_raw8_demo_file)

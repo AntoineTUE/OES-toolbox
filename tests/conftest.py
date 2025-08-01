@@ -45,7 +45,7 @@ def Andor_kinetic_sif_file():
 @pytest.fixture(scope="session")
 def Avantes_raw8_demo_file():
     """A sample file recorded by AvaSoft 8 running in demo mode."""
-    file = Path("./tests/test_files/avasoft8_demo.raw8")
+    file = Path("./tests/test_files/avasoft8_demo.RAW8")
     pixel_indices = np.fromfile(file,dtype=np.dtype("H"),offset=89,count=2)
     data = pd.DataFrame(
         np.fromfile(
