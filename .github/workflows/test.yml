@@ -28,8 +28,10 @@ jobs:
     - name: Set up uv
       uses: astral-sh/setup-uv@v6
       with:
-        version: "latest"
         enable-cache: true
+        cache-dependency-glob: "pyproject.toml"
+        version: "latest"
+        activate-environment: true
 
     - name: Install Hatch
       run: uv pip install --upgrade --system hatch
