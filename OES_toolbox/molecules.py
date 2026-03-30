@@ -1,7 +1,6 @@
 import os
 import datetime
 from pathlib import Path
-from pathlib import Path
 import numpy as np
 from scipy.signal import fftconvolve
 
@@ -443,10 +442,7 @@ class molecule_module:
         num_checked = 0
         for mol_sel in self.molecule_selectors:
             if mol_sel.isChecked() and mol_sel.can_fit: 
-            if mol_sel.isChecked() and mol_sel.can_fit: 
                 num_checked = num_checked + 1
-        self.mw.mol_multitemp_group.setVisible(num_checked>=2)
-          
         self.mw.mol_multitemp_group.setVisible(num_checked>=2)
           
     def clear_table(self):
