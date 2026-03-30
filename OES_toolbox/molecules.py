@@ -1,6 +1,7 @@
 import os
 import datetime
 from pathlib import Path
+from pathlib import Path
 import numpy as np
 from scipy.signal import fftconvolve
 
@@ -9,27 +10,11 @@ from PyQt6.QtWidgets import QFileDialog, QTreeWidgetItemIterator, QTableWidgetIt
 from PyQt6.QtCore import Qt, QObject, QThread, pyqtSignal
 from PyQt6.QtGui import QAction
 from PyQt6 import QtGui
-import pyqtgraph as pg
 
 from .Widgets import MoleculeCheckBox
 from .lazy_import import lazy_import
 scipy = lazy_import("scipy")
 Moose = lazy_import("Moose")
-
-from typing import TYPE_CHECKING
-if TYPE_CHECKING:
-    from pandas import DataFrame
-    from collections.abc import Callable
-
-import lmfit
-from Moose.lmfit import multi_species_objective
-
-PARAMARGS = ('vary',"min",'max')
-
-DEFAULT_PARAMS = Moose.default_params
-DEFAULT_PARAMS["T_vib"]['max'] = 25000
-DEFAULT_PARAMS["T_rot"]['max'] = 25000
-
 # Exclude high J Swan band database; can quickly run OOM without care
 MOLECULES = [f for f in Moose.database_files if "J300" not in f]
 MOLECULE_DB_LABELS = {
@@ -59,67 +44,37 @@ LIFBASE_LABELS = {
     'CNBX': "CN (B-X)"
 }
 
-# constants for UserRoles for storing fit results with QTableWidgetItems
-PlotItemRole = Qt.ItemDataRole.UserRole+1
-FitResultRole = Qt.ItemDataRole.UserRole+2
 
+def model_for_fit(x, T_rot, T_vib, sim_db, instr, resolution=1000, wl_pad=10):
+    """Function copied from Moose without the normalization to the maximum. """
+    import Moose # free re-implementation of MassiveOES
 
-def make_fit_params(y, species:list[str], Trot:float, Tvib:float, mu:float, separate_Tvib=True, separate_Trot=True, vary_broadening=True, vary_shift=False) -> lmfit.parameter.Parameters:
-    """Construct suitable fit parameters with bounds for fitting a spectrum with the `Moose.lmfit.multi_species_objective` function.
+    sticks = Moose.create_stick_spectrum(T_vib, T_rot, df_db=sim_db)
+    refined = Moose.equidistant_mesh(sticks, wl_pad=wl_pad, resolution=resolution)
+    simulation = apply_voigt(refined, instr)
+    sim_matched = match_spectra(x.reshape(-1, 1), simulation)
+    return sim_matched[:, 1]
 
-    For each element in the `species` list, it will add `fraction` and optional `T_rot`/`T_vib` parameters, as appropriate.
-    
-    Will calculate bounds and set parameters as free/fixed depending on provided arguments, which can come from the UI state.
+def apply_voigt(sim, instr):
+    """Function copied from Moose to allow arbitrary instrumental functions."""
+    from scipy.signal import fftconvolve
+    x = sim[:, 0]
+    conv = fftconvolve(sim[:, 1], instr(x), mode="same")
+    return np.array([x, conv]).T
 
-    The parameter bounds are made assuming that `multi_species_objective` will be called with the `normalize` kwargs set to `True`.
+def match_spectra(meas, sim):
+    """Function copied from Moose to solve out of bounds errors."""
+    from scipy.interpolate import make_interp_spline as interp1d
+    interp = interp1d(sim[:, 0], sim[:, 1])
+    interp.extrapolate = False
+    matched_y = interp(meas[:, 0])
+    matched_y = np.nan_to_num(matched_y)
+    return np.array([meas[:, 0], matched_y]).T
 
-    This means that `fraction` should be interpreted as a non-normalized `weight` to the total intensity, and is affected by strength of emitter.
-
-    (Stronger emitters will cause a lower weight).
-
-    Arguments:
-        y (NDArray):            The array of y-data, to calculate offset parameter `b` and total amplitude `A` from.
-        species (list[str]):    List of species names, for the species that will be used in the model objective function
-        Trot (float):           Initial estimate of T_rot
-        Tvib (float):           Initial estimate of T_vib
-        mu (float):             Initial wavelength shift in nm.
-        separate_Tvib (bool):   Flag to use different vibrational temperatures for each species
-        separate_Trot (bool):   Flag to use different rotational temperatures for each species
-        vary_broadening (bool): Flag to optimize broadening parameters during fit, or leave them fixed.
-        vary_shift (bool):      Flag to vary the wavelength shift during fitting, or leave it fixed.
-    
-    Returns:
-        Parameters:     A lmfit.Parameters instance with parameter values and bounds configured according to the current UI settings.
-    """
-    #TODO: decide if using `normalize=True` or `False`.
-    separate_Tvib = separate_Tvib and (len(species)>1)
-    separate_Trot = separate_Trot and (len(species)>1)
-    y_min = y.min()
-    y_max = y.max()
-    y_diff = y_max-y_min
-    # var = (y-y_min).std()
-    params = lmfit.create_params(**DEFAULT_PARAMS)
-    params.add("b", y_min, True, y_min - y_diff, y_min + y_diff)
-    params.add("A", y_diff, vary =True, min = 0, max = y_diff*1.5)
-    # params.pop("A")  # use this if using `normalize=False`
-    params['sigma'].vary = vary_broadening
-    params['gamma'].vary = vary_broadening
-    params['mu'].vary = vary_shift
-    params['mu'].value = mu
-    params['T_rot'].value = Trot
-    params['T_vib'].value = Tvib
-    weight = 1/len(species)*y_diff
-    if separate_Tvib:
-        params.pop("T_vib")
-    if separate_Trot:
-        params.pop("T_rot")
-    for specie in species:
-        if separate_Trot:
-            params.add(f"T_rot_{specie}", value = Trot, **{k:v for k,v in DEFAULT_PARAMS['T_vib'].items() if k in PARAMARGS})
-        if separate_Tvib:
-            params.add(f"T_vib_{specie}", value = Tvib, **{k:v for k,v in DEFAULT_PARAMS['T_vib'].items() if k in PARAMARGS})
-        params.add(f"fraction_{specie}", weight,vary=True,min=0,max=1) # adjust if using `normalize=False`
-    return params
+def get_mOES_spec(x, Tvib, Trot, data, instr):
+    # TODO: explictily handle errors now that all exceptions are not silently ignored.
+    sim_y = model_for_fit(x, Trot, Tvib, data, instr)
+    return sim_y/np.sum(sim_y)
 
 
 class MoleculeFitter(QObject):
@@ -140,8 +95,43 @@ class MoleculeFitter(QObject):
         self.sep_Tvib = sep_Tvib
         self.get_instr = instr_func # function copy from Window class
         self.stop = False # stop flag invoked by button press
-        self.allow_shift = allow_shift # Plot data is shifted itself, no need for a shift value if using plot data.
-        self.allow_stretch =  allow_stretch
+        self.shift, self.stretch = shift, stretch
+
+    finished = pyqtSignal()
+    result_ready = pyqtSignal(str, np.ndarray, np.ndarray, np.ndarray)
+    # data_ready = pyqtSignal(str, astropy.table.table.Table)
+    progress = pyqtSignal(int)
+
+
+    def fitfunc(self, x, *args):
+        p0 = list(args) # needed for pop
+        y0 = p0.pop(0)
+        stretch, shift = 0, 0
+        if self.stretch:
+            stretch = p0.pop(-1)
+        if self.shift:
+            shift = p0.pop(-1)
+
+        if not self.sep_Trot:
+            Trot = p0.pop(0)
+        if not self.sep_Tvib:
+            Tvib = p0.pop(0)
+
+        specs = []
+        for mol_sel in self.molecules:
+            if mol_sel.isChecked() and mol_sel.can_fit == True:
+                A = p0.pop(0)        
+                if self.sep_Trot:
+                    Trot = p0.pop(0)
+                if self.sep_Tvib:
+                    Tvib = p0.pop(0)
+                x_new = np.mean(x) + ((x - np.mean(x)) * (1 + stretch)) + shift
+                db = mol_sel.get_db()
+                this_spec = A*get_mOES_spec(x_new, Tvib, Trot, db, self.get_instr)
+                specs.append(this_spec)
+        
+        return np.sum(specs, axis=0) + y0
+
 
     def fit(self):
         self.progress.emit(1)
@@ -181,14 +171,9 @@ class MoleculeFitter(QObject):
 # <------------------------- molecules module -----------------------------> #
 ##############################################################################   
 class molecule_module:
-class molecule_module:
     def __init__(self, mainWindow):
         self.mw = mainWindow
         self.get_instr = self.mw.settings.get_instr 
-        molecule_list_fit = [{"ident":k,"label":MOLECULE_DB_LABELS.get(k,k), "src":"mOES"} for k in MOLECULES]
-        molecule_list_no_fit = [{'ident':k, "label":LIFBASE_LABELS.get(k,k), "src":"LIFBASE"} for k in LIFBASE_SIMS]
-        
-        self.molecule_selectors:list[MoleculeCheckBox] = []
         molecule_list_fit = [{"ident":k,"label":MOLECULE_DB_LABELS.get(k,k), "src":"mOES"} for k in MOLECULES]
         molecule_list_no_fit = [{'ident':k, "label":LIFBASE_LABELS.get(k,k), "src":"LIFBASE"} for k in LIFBASE_SIMS]
         
@@ -208,22 +193,32 @@ class molecule_module:
             self.molecule_selectors.append(this_mol_check)
             self.mw.mol_select_grid_nofit.addWidget(this_mol_check, row, col)
    
-        for i,molecule in enumerate(molecule_list_fit):
-            row,col = divmod(i,3)
-            this_mol_check = MoleculeCheckBox(**molecule, parent=self.mw)
-            this_mol_check.stateChanged.connect(self.change_sel)
-            self.molecule_selectors.append(this_mol_check)
-            self.mw.mol_select_grid.addWidget(this_mol_check, row, col)
-
-        for i,molecule in enumerate(molecule_list_no_fit):
-            row, col = divmod(i,3)
-            this_mol_check = MoleculeCheckBox(**molecule, parent=self.mw)
-            this_mol_check.stateChanged.connect(self.change_sel)
-            self.molecule_selectors.append(this_mol_check)
-            self.mw.mol_select_grid_nofit.addWidget(this_mol_check, row, col)
-   
         self.mol_fit_threads = []
         self.mol_fit_workers = []
+        
+
+    def fitfunc(self, x, *args):
+        p0 = list(args) # needed for pop
+        y0 = p0.pop(0)
+
+        if not self.mw.mol_multifit_rot_check.isChecked():
+            Trot = p0.pop(0)
+        if not self.mw.mol_multifit_vib_check.isChecked():
+            Tvib = p0.pop(0)
+
+        specs = []
+        for mol_sel in self.molecule_selectors:
+            if mol_sel.isChecked() and mol_sel.can_fit is True:
+                A = p0.pop(0)        
+                if self.mw.mol_multifit_rot_check.isChecked():
+                    Trot = p0.pop(0)
+                if self.mw.mol_multifit_vib_check.isChecked():
+                    Tvib = p0.pop(0)
+                this_spec = A*get_mOES_spec(x, Tvib, Trot, mol_sel.get_db(), self.get_instr)
+                specs.append(this_spec)
+        
+        return np.sum(specs, axis=0) + y0
+
 
     def show_spec(self):
         self.clear_spec()
@@ -237,31 +232,30 @@ class molecule_module:
         
         
         min_x, max_x, min_y ,max_y = self.mw.get_bounds()
-        min_y = max(min_y, 0) # clamp to minimum of 0 for visualization
-
-        Trot = self.mw.mol_Trot_sbox.value()
-        Tvib = self.mw.mol_Tvib_sbox.value()
         
+        # x = np.linspace(min_x)
         for mol_sel in self.molecule_selectors:
             if mol_sel.isChecked(): 
                 db = mol_sel.get_db((min_x, max_x)) # will cache if not loaded yet
-                if db.shape[0]<1:
-                    sim_x = [min_x, max_x]
-                    sim_y = [0, 0]
-                elif mol_sel.src == "mOES" and mol_sel.can_fit:
+                if mol_sel.src == "mOES" and mol_sel.can_fit:
+                    Trot = self.mw.mol_Trot_sbox.value()
+                    Tvib = self.mw.mol_Tvib_sbox.value()
                     sim_x = np.linspace(min_x, max_x, int((max_x - min_x) * 200))
-                    #TODO: support broadening once more
-                    sim_y = Moose.model_for_fit(sim_x, 0.001, 0.001, 0, Trot, Tvib, A = max_y-min_y, b = min_y, sim_db = db)
-                elif mol_sel.src == "LIFBASE":
+                    sim_y = get_mOES_spec(sim_x, Tvib, Trot, db, self.get_instr)
+                    sim_y = sim_y / np.max(sim_y) * max_y
+
+                    self.mw.plot(sim_x, sim_y, 'molecule: ' + mol_sel.label 
+                                            + ' Tvib = ' + str(round(Tvib)) 
+                                            + ' Trot = ' + str(round(Trot)) )
+                        
+                if mol_sel.src == "LIFBASE":
                     instr = self.get_instr(db.wl)
-                    sim_x = db.wl
-                    sim_y = scipy.signal.fftconvolve(db.I, instr / np.sum(instr), mode='same')
-                    sim_y = sim_y/np.max(sim_y) * (max_y-min_y)+min_y
-                tag = ' fixed temperature' if mol_sel.src=='LIFBASE' else '' # prefix string with space if not empty
-                tag_Trot = f"Trot = {Trot if mol_sel.src !='LIFBASE' else 500 :.0f} K"
-                tag_Tvib = f"Tvib = {Tvib if mol_sel.src !='LIFBASE' else 2500:.0f} K"
-                label = f"molecule: {mol_sel.label}{tag} {tag_Trot} {tag_Tvib}"
-                self.mw.plot(sim_x, sim_y,label)
+                    simy = fftconvolve(db.I, instr/np.sum(instr), mode='same')
+                    simy = simy/np.max(simy) * max_y
+
+                    self.mw.plot(db.wl, simy, 'molecule: ' + mol_sel.label 
+                                            + ' fixed temperature Tvib = 2500 K' 
+                                            + ' Trot = 500 K' )
 
         self.mw.update_spec_colors()
 
@@ -453,16 +447,14 @@ class molecule_module:
         num_checked = 0
         for mol_sel in self.molecule_selectors:
             if mol_sel.isChecked() and mol_sel.can_fit: 
+            if mol_sel.isChecked() and mol_sel.can_fit: 
                 num_checked = num_checked + 1
         self.mw.mol_multitemp_group.setVisible(num_checked>=2)
           
+        self.mw.mol_multitemp_group.setVisible(num_checked>=2)
+          
     def clear_table(self):
-        """Delete table items row by row to ensure proper cleanup of associated plot items.
-        
-        Must traverse the table in reverse order to avoid index errors as rowCount changes during iteration.
-        """
-        for i in range(self.mw.mol_fit_results_table.rowCount()-1,-1,-1):
-            self.del_table_row(i)
+        self.mw.mol_fit_results_table.setRowCount(0)
 
     def del_table_row(self, row):
         """Delete a row from the molecure fit results table and remove the associated plot item."""
@@ -470,15 +462,6 @@ class molecule_module:
         self.mw.specplot.removeItem(plot_item)
         plot_item.deleteLater()
         self.mw.mol_fit_results_table.removeRow(row)
-
-    def del_table_col(self,col):
-        """Delete a column from the fit result table.
-        
-        Will not remove the first column (i.e. the plot item label), since elements in this column contain required extra data in the UserRoles.
-        """
-        if col==0:
-            return
-        self.mw.mol_fit_results_table.removeColumn(col)
 
     def fit_results_rightClick(self, cursor):
         """Show a right-click menu to interact with the fit result table."""
@@ -520,8 +503,6 @@ class molecule_module:
 
 
     def plotl_table_item(self, row_idx, plot:bool):
-        """Add or remove a fit result plot to the graph, depending on if it is currently drawn or not."""
-        plot_item = self.mw.mol_fit_results_table.item(row_idx, 0).data(PlotItemRole)
         if plot:
             self.mw.specplot.addItem(plot_item) 
         else:

@@ -9,7 +9,7 @@ import qtawesome as qta
 import Moose
 
 from OES_toolbox.file_handling import FileLoader, SpectraDataset
-from OES_toolbox.logger import ContextLogger
+from OES_toolbox.logger import Logger
 from OES_toolbox.lazy_import import lazy_import
 
 pd = lazy_import("pandas")
@@ -457,22 +457,20 @@ class MoleculeCheckBox(QCheckBox):
                 data.wl=data.iloc[:,0]/10 # Angstrom to nm
                 self._db = data
 
-    def get_db(self, wavelength_interval:tuple[float,float]|None = None, wl_pad:float|int = 10):
+    def get_db(self,wavelength_interval:tuple|None=None):
         """Return a slice of a database, or LIFBASE spectrum, within the specified `wavelength_interval`.
 
         If no interval is provided (the default), it will lookup the active bounds from the main window.
 
         If no data(base) has been loaded yet, calling this method will trigger a `load_database` call, which will cache the data.
 
-        To avoid edge effects, it will look up a slightly wider slice of data on both sides of the interval, based on the `wl_pad` argument (default=10).
-
         Note: for automatic lookup of the bounds to work correctly, the widget instance must have a parent that is part of the OESToolbox main window.
         """
         colname = 'wl' if self.src.upper()=="LIFBASE" else 'air_wavelength'
         if wavelength_interval is None:
             wl_min, wl_max, *_= self.window().get_bounds()
-        else:
-            wl_min,wl_max = wavelength_interval
-        data = self.db[self.db[colname].between(wl_min - wl_pad, wl_max + wl_pad)]
+            wavelength_interval = (wl_min,wl_max)
+        
+        data = self.db[self.db[colname].between(*wavelength_interval)]
         return data
      
