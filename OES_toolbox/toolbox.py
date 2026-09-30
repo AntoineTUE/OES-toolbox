@@ -159,8 +159,8 @@ class Window(QMainWindow):
         self.file_list.viewport().installEventFilter(self)
 
         # help menu
-        self.actionDocumentation.triggered.connect(lambda: webbrowser.open('https://github.com/mimurrayy/OES-toolbox/wiki'))
-        self.actionHow_to_cite.triggered.connect(lambda: webbrowser.open('https://github.com/mimurrayy/OES-toolbox/wiki/How-to-cite'))
+        self.actionDocumentation.triggered.connect(lambda: webbrowser.open('https://github.com/Julian-Held/OES-toolbox/wiki'))
+        self.actionHow_to_cite.triggered.connect(lambda: webbrowser.open('https://github.com/Julian-Held/OES-toolbox/wiki/How-to-cite'))
         self.actionAbout.triggered.connect(lambda: about_dialog().exec())
 
         # spectromter settings
