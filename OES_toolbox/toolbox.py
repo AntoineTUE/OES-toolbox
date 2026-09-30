@@ -29,7 +29,7 @@ from OES_toolbox.settings import settings
 from OES_toolbox.ident import ident_module
 from OES_toolbox.molecules import molecule_module
 from OES_toolbox.continuum import cont_module
-from OES_toolbox.Widgets import SpectrumTreeItem
+from OES_toolbox.Widgets import SpectrumTreeItem, FileTreeWatcher
 from OES_toolbox.logger import ContextLogger
 from OES_toolbox.lazy_import import lazy_import
 from OES_toolbox.file_handling import FileLoader
@@ -85,6 +85,7 @@ class Window(QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
         uic.loadUi(file_dir + "/ui/main.ui", self)
+        self.file_watcher = FileTreeWatcher(self.file_list, self)
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0,0)
         self.progress_bar.setMaximumWidth(180)
@@ -317,14 +318,19 @@ class Window(QMainWindow):
         if event.key() == Qt.Key.Key_Delete:
             iterator = QTreeWidgetItemIterator(self.file_list,flags=QTreeWidgetItemIterator.IteratorFlag.Selected)
             root = self.file_list.invisibleRootItem()
-            targets = []
+            targets:list[SpectrumTreeItem] = []
             # Don't remove items in iterator since it changes the length/item index positions.
             while iterator.value():
                 this_item = iterator.value()
                 targets.append(this_item)
                 iterator += 1
             for t in targets:
-                t.remove()   
+                t.remove()
+                if t.is_dir:
+                    self.file_watcher.removePath(t.path.as_posix())
+                if t.is_file:
+                    self.logger.debug("File watcher will ignore %s unless the file itself changes", t.path.stem)
+                    self.file_watcher.addPath(t.path.as_posix())
         else:
             QTreeWidget.keyPressEvent(self.file_list, event)
         event.accept()
@@ -370,6 +376,7 @@ class Window(QMainWindow):
         folder = Path(folder)
         if folder.is_dir():
             self.active_folder = folder.as_posix()
+            self.file_watcher.addPath(folder.as_posix())
         item = SpectrumTreeItem(folder,label="",is_content=False)
         self.file_list.addTopLevelItem(item)
         item.iterdir()
@@ -646,6 +653,7 @@ class Window(QMainWindow):
             iterator.value().setCheckState(0,Qt.CheckState.Unchecked)
             iterator += 1
 
+    
     def get_bounds(self)->tuple[float,float,float,float]:
         """Get the bounds to apply to the data from the UI state.
         
@@ -752,7 +760,7 @@ class Window(QMainWindow):
 
         bg_action.triggered.connect(lambda: self.on_set_background_action(file_item))
         clear_action.triggered.connect(self.on_file_clear_action)
-        del_this_action.triggered.connect(file_item.remove)
+        del_this_action.triggered.connect(lambda: self.on_file_clear_action(file_item))
         del_selected_action.triggered.connect(self.on_file_clear_action)
         del_unselected_action.triggered.connect(self.on_file_clear_action)
         del_unchecked_action.triggered.connect(self.on_file_clear_action)
@@ -777,6 +785,10 @@ class Window(QMainWindow):
         triggered_by = self.sender().text()
         self.logger.info(f"Action fired: {triggered_by}")
         match triggered_by:
+            case "Clear this item":
+                if len(args)<1:
+                    return
+                targets = args
             case "Clear selected"|"Clear file":
                 targets: list[SpectrumTreeItem]  = self.file_list.selectedItems()
             case "Clear not selected":
@@ -805,6 +817,10 @@ class Window(QMainWindow):
             current_index = self.file_list.indexFromItem(item)
             if current_index.isValid():
                 self.file_list.itemFromIndex(current_index).remove()
+                # start watching files so they can be re-added if they are modified
+                if item.path.is_file() and triggered_by not in ("Clear all","Clear Files") and item.path.as_posix() not in self.file_watcher.files():
+                    self.logger.debug("File watcher will ignore %s unless the file itself changes", item.path.name)
+                    self.file_watcher.addPath(item.path.as_posix())
 
     def on_reload_file_action(self, file_item:SpectrumTreeItem):
         """Reload data from disk for the specified item.
