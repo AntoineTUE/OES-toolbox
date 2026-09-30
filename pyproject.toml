@@ -40,10 +40,10 @@ dependencies = [
 ]
 
 [project.scripts]
-OES-toolbox-dev = "OES_toolbox:main"
+OES-toolbox-dev = "OES_toolbox.main:main"
 
 [project.gui-scripts]
-OES-toolbox = "OES_toolbox:main"
+OES-toolbox = "OES_toolbox.main:main"
 
 [project.urls]
 Homepage = "https://oes-toolbox.com"

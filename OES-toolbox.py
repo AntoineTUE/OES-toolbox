@@ -1,11 +1,13 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from PyQt6.QtWidgets import QSplashScreen, QApplication
-from PyQt6.QtGui import QPixmap
-from OES_toolbox.ui import resources # seems unused but is needed!
 import sys
-from OES_toolbox import main
+
+from PyQt6.QtGui import QPixmap
+from PyQt6.QtWidgets import QApplication, QSplashScreen
+
+from OES_toolbox.main import main
+from OES_toolbox.ui import resources  # seems unused but is needed!
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())
