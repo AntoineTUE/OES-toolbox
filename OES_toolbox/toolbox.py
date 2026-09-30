@@ -932,22 +932,8 @@ class Window(QMainWindow):
         else:
             self.apply_cal_check.setEnabled(False)
 
+    def closeEvent(self,event):
+        event.accept()
+        self.log_widget.close()
 
-    def cal_info_text(self, index):
-            if index.isValid():
-                QtGui.QToolTip.showText(
-                    QtGui.QCursor.pos(),
-                    index.data(),
-                    self.view.viewport(),
-                    self.view.visualRect(index)
-                    )
-    
-    
 
-def run(app, splash):
-    app.setApplicationName("OES toolbox")
-
-    win = Window()
-    win.show()
-    splash.finish(win)
-    sys.exit(app.exec())
