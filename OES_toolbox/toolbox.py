@@ -4,6 +4,8 @@ from pathlib import Path
 import platform
 import subprocess
 import numpy as np
+from matplotlib import colormaps
+from itertools import cycle
 from PyQt6 import uic
 from PyQt6.QtWidgets import QApplication, QFileDialog, QTreeWidgetItem, \
         QTreeWidgetItemIterator , QHeaderView, \
@@ -401,37 +403,27 @@ class Window(QMainWindow):
     
     def update_spec_colors(self):
         """Walks through the plotted curves and assignes colors."""
-        cc = 0   
+        cc = cycle(['k']+colors) # preserve CMYK black as the first color
         for plot_item in self.specplot.listDataItems():
             if "file:" in plot_item.name():
-                pen = pg.mkPen(color=colors[cc])
-                plot_item.setPen(pen)
-                plot_item.setZValue(1)
-                cc = cc + 1
-                cc = cc%len(colors)
-                
-        for plot_item in self.specplot.listDataItems():                     
-            if "cont.:" in plot_item.name():
-                pen = pg.mkPen(color=colors[cc], width=2)
-                plot_item.setPen(pen)
-                plot_item.setZValue(10)
-                cc = cc + 1
-                cc = cc%len(colors)   
-                
-        for plot_item in self.specplot.listDataItems():     
-            if "molecule:" in plot_item.name():
-                pen = pg.mkPen(color=colors[cc], style=Qt.PenStyle.DashLine)
-                plot_item.setPen(pen)
-                plot_item.setZValue(20)
-                cc = cc + 1
-                cc = cc%len(colors)
-        
-        for plot_item in self.specplot.listDataItems():     
-            if "NIST:" in plot_item.name():
-                pen = pg.mkPen(color=colors[cc], style=Qt.PenStyle.DashLine, width=1.0)
-                plot_item.setPen(pen)
-                cc = cc + 1
-                cc = cc%len(colors)
+                w = 1
+                style = Qt.PenStyle.SolidLine
+                zVal = 1 
+            elif "cont.:" in plot_item.name():
+                w = 2
+                style = Qt.PenStyle.SolidLine
+                zVal = 10
+            elif "molecule:" in plot_item.name():
+                w = 1
+                style = Qt.PenStyle.DashLine
+                zVal = 20        
+            elif "NIST:" in plot_item.name():
+                w = 1
+                style = Qt.PenStyle.DashLine
+                zVal = 0
+            pen = pg.mkPen(color = next(cc), width=w, style = style)
+            plot_item.setPen(pen)
+            plot_item.setZValue(zVal)
     
     
     def update_progress_bar(self,p):
