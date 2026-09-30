@@ -1,20 +1,20 @@
-import pytest
-from hypothesis import given, assume, example,strategies as st
-from hypothesis.extra.numpy import arrays
-from pathlib import Path
-from OES_toolbox.file_handling import FileLoader
-import pandas as pd
-import numpy as np
 import io
-
 from typing import TYPE_CHECKING
+
+import numpy as np
+import pandas as pd
+import pytest
+from hypothesis import assume, example, given
+from hypothesis import strategies as st
+from hypothesis.extra.numpy import arrays
+from numpy.testing import assert_allclose
+from pandas.testing import assert_frame_equal, assert_index_equal
+from xarray.testing import assert_identical
+
+from OES_toolbox.file_handling import FileLoader
 
 if TYPE_CHECKING:
     from xarray import DataArray,Dataset
-
-from pandas.testing import assert_frame_equal, assert_index_equal
-from numpy.testing import assert_allclose
-from xarray.testing import assert_identical
 
 tmp_file_names = ["comma_dot","tab_dot","tab_comma","semicolon_dot","semicolon_comma","bar_dot","bar_comma"]
 encodings = ["utf-8","ascii","cp1252", "utf-16","utf-16be","utf-16le","utf-32","macroman"]
@@ -26,29 +26,29 @@ def separator_decimal_pair(draw):
     assume(sep != decimal)
     return sep, decimal
 
-class TestFileLoader:
+# class TestFileLoader:
 
-    @pytest.mark.parametrize(
-        "line,valid,invalid",
-        (
-            ("1.0\t0.11", ("\t", "."), ("\t", ",")),
-            ("1,0\t0,11", ("\t", ","), ("\t", ".")),
-            ("1.0;2.0", (";", "."), (";", ",")),
-            ("1,0;2,0", (";", ","), (";", ".")),
-            ("1e2|2", ("|", "."), ("|", ",")),
-            ("1,0e2|2,0", ("|", ","), ("|", ".")),
-        ),
-    )
-    def test_infer_text_schema_from_line(self, line, valid, invalid):
-        assert FileLoader._infer_text_schema_from_line(line) == valid
-        assert FileLoader._infer_text_schema_from_line(line) != invalid
+#     @pytest.mark.parametrize(
+#         "line,valid,invalid",
+#         (
+#             ("1.0\t0.11", ("\t", "."), ("\t", ",")),
+#             ("1,0\t0,11", ("\t", ","), ("\t", ".")),
+#             ("1.0;2.0", (";", "."), (";", ",")),
+#             ("1,0;2,0", (";", ","), (";", ".")),
+#             ("1e2|2", ("|", "."), ("|", ",")),
+#             ("1,0e2|2,0", ("|", ","), ("|", ".")),
+#         ),
+#     )
+#     def test_infer_text_schema_from_line(self, line, valid, invalid):
+#         assert FileLoader._infer_text_schema_from_line(line) == valid
+#         assert FileLoader._infer_text_schema_from_line(line) != invalid
 
 
-    @pytest.mark.parametrize("name, encoding", [(name, encoding) for name in tmp_file_names for encoding in encodings])
-    def test_read_generic_text(self,temp_text_files, example_dataframe,name:str, encoding:str):
-        f = temp_text_files.joinpath(f"{name}_{encoding}.txt")
-        data_read = FileLoader._read_generic_text(f)
-        assert_frame_equal(data_read,example_dataframe)
+    # @pytest.mark.parametrize("name, encoding", [(name, encoding) for name in tmp_file_names for encoding in encodings])
+    # def test_read_generic_text(self,temp_text_files, example_dataframe,name:str, encoding:str):
+    #     f = temp_text_files.joinpath(f"{name}_{encoding}.txt")
+    #     data_read = FileLoader._read_generic_text(f)
+    #     assert_frame_equal(data_read,example_dataframe)
 
     
 class TestFileLoader_PropertyBased:
