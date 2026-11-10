@@ -251,11 +251,9 @@ class Window(QMainWindow):
 ##############################################################################
 
     def eventFilter(self, source, event): #prevents spec select on right click
-        if hasattr(event, 'button'):
-            if (event.button() == Qt.RightButton and
-                source is self.file_list.viewport()):
-                return True
-        return super(Window, self).eventFilter(source, event)
+        if (event.type() is QtCore.QEvent.Type.MouseButtonPress) and (event.button() is Qt.MouseButton.RightButton) and (source==self.file_list.viewport()):
+            return True
+        return super().eventFilter(source, event)
 
 
     def toggle_left_pane(self):
