@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling","hatch-vcs","hatch-fancy-pypi-readme", "pip-tools"]
+requires = ["hatchling", "hatch-vcs", "hatch-fancy-pypi-readme", "pip-tools"]
 build-backend = "hatchling.build"
 
 [project]
@@ -9,9 +9,7 @@ description = "Tool for low-temperature plasma optical emission spectroscopy."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
-authors = [
-    { name = "Julian Held", email = "j.held@tue.nl" },
-]
+authors = [{ name = "Julian Held", email = "j.held@tue.nl" }]
 classifiers = [
     "Operating System :: OS Independent",
     "Intended Audience :: Science/Research",
@@ -19,7 +17,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.13"
 ]
 dependencies = [
     "matplotlib>=3.7.0",
@@ -49,8 +47,8 @@ OES-toolbox = "OES_toolbox:main"
 Homepage = "https://oes-toolbox.com"
 
 [tool.hatch.version]
-source="vcs"
-fallback-version="0.0.1dev"
+source = "vcs"
+fallback-version = "0.0.1dev"
 
 [tool.hatch.build.hooks.vcs]
 version-file = "OES_toolbox/_version.py"
@@ -60,51 +58,45 @@ allow-direct-references = true
 
 [tool.hatch.metadata.hooks.fancy-pypi-readme]
 content-type = "text/markdown"
-fragments = [
-    { path = "README.md" }
-]
+fragments = [{ path = "README.md" }]
 
 [tool.hatch.build]
 packages = ["OES_toolbox/"]
 
 [tool.hatch.build.targets.sdist]
-include = [
-    "/oes_toolbox",
-]
+include = ["/oes_toolbox"]
 
 [tool.hatch.envs.default]
 installer = "uv"
-extra-dependencies = ["ipykernel","ipython","cx_Freeze>=8.0", "scipy<1.17"]
+extra-dependencies = ["ipykernel", "ipython", "cx_Freeze>=8.0", "scipy<1.17"]
 
 [tool.hatch.envs.hatch-test]
 parallel = false
 extra-dependencies = ["hypothesis"]
 
 [[tool.hatch.envs.hatch-test.matrix]]
-python = ["3.10", "3.11","3.12","3.13"]
+python = ["3.10", "3.11", "3.12", "3.13"]
 
 [tool.ruff]
-line-length=120
+line-length = 120
 target-version = "py310"
 
 [tool.ruff.format]
 exclude = ["*.py"]
 
 [tool.ruff.lint]
-extend-ignore = ["F401","E402","D"]
-extend-select = ["E4", "E7", "E9", "F","C4", "SIM", "NPY", "PD","B","UP"]
+extend-ignore = ["F401", "E402", "D"]
+extend-select = ["E4", "E7", "E9", "F", "C4", "SIM", "NPY", "PD", "B", "UP"]
 
 [tool.pytest.ini_options]
-addopts = [
-    "--import-mode=importlib",
-]
+addopts = ["--import-mode=importlib"]
 
 [tool.setuptools.dynamic]
-version = {attr = "OES_toolbox.__version__"}
+version = { attr = "OES_toolbox.__version__" }
 
 [tool.cxfreeze]
 executables = [
-    {script = "OES-toolbox.py", base = "gui", icon="icon", shortcut_name="OES toolbox", shortcut_dir="MyProgramMenu"}
+    { script = "OES-toolbox.py", base = "gui", icon = "icon", shortcut_name = "OES toolbox", shortcut_dir = "MyProgramMenu" }
 ]
 
 [tool.cxfreeze.build_exe]
@@ -117,15 +109,28 @@ install_icon = "icon.png"
 
 [tool.cxfreeze.bdist_msi.data]
 Directory = [
-    ["ProgramMenuFolder", "TARGETDIR", "."],
-    ["MyProgramMenu", "ProgramMenuFolder", "MYPROG~1|My Program"]
+    [
+        "ProgramMenuFolder",
+        "TARGETDIR",
+        "."
+    ],
+    [
+        "MyProgramMenu",
+        "ProgramMenuFolder",
+        "MYPROG~1|My Program"
+    ]
 ]
 ProgId = [
-    ["OES.toolbox", 0, 0, "Helping out with optical emission spectroscopy of low-temperature plasmas.", "OEStoolboxIcon", 0]
+    [
+        "OES.toolbox",
+        0,
+        0,
+        "Helping out with optical emission spectroscopy of low-temperature plasmas.",
+        "OEStoolboxIcon",
+        0
+    ]
 ]
-Icon = [
-    ["OEStoolboxIcon", "icon.ico"]
-]
+Icon = [["OEStoolboxIcon", "icon.ico"]]
 
 [tool.cxfreeze.bdist_dmg]
 applications_shortcut = "True"
