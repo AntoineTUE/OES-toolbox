@@ -1,28 +1,30 @@
-import os
-import datetime
+from importlib.metadata import version
 from pathlib import Path
-import numpy as np
-from PyQt6.QtWidgets import QFileDialog, QTreeWidgetItemIterator, QTableWidgetItem, \
-        QMessageBox, QCheckBox, QMenu
-from PyQt6.QtCore import Qt, QObject, QThread, pyqtSignal, QThreadPool
-from PyQt6.QtGui import QAction
-from PyQt6 import QtGui, QtWidgets
-import pyqtgraph as pg
 
-from .Widgets import MoleculeCheckBox, SpectrumTreeItem
+import Moose
+import Moose.Simulation
+import numpy as np
+import pyqtgraph as pg
+import scipy
+from PyQt6 import QtGui, QtWidgets
+from PyQt6.QtCore import QObject, Qt, QThreadPool, pyqtSignal
+from PyQt6.QtGui import QAction
+from PyQt6.QtWidgets import QMenu, QTableWidgetItem, QTreeWidgetItemIterator
+
 from .lazy_import import lazy_import
-scipy = lazy_import("scipy")
+from .Widgets import MoleculeCheckBox, SpectrumTreeItem
+
 lmfit = lazy_import("lmfit")
-Moose = lazy_import("Moose")
-Moose.Simulation = lazy_import("Moose.Simulation")
 
 from typing import TYPE_CHECKING
-if TYPE_CHECKING:
-    import lmfit.minimizer
-    from pandas import DataFrame
 
+if TYPE_CHECKING:
+    from lmfit.minimizer import MinimizerResult
+    from pandas import DataFrame
+    
+
+from .calc import make_fit_params
 from .workers import MooseFitWorker
-from .calc import make_fit_params, molecule_objective
 
 PARAMARGS = ('vary',"min",'max')
 
@@ -31,7 +33,11 @@ DEFAULT_PARAMS["T_vib"]['max'] = 25000
 DEFAULT_PARAMS["T_rot"]['max'] = 25000
 
 # Exclude high J Swan band database; can quickly run OOM without care
-MOLECULES = [f for f in Moose.database_files if "J300" not in f]
+if tuple(map(int, version("moose-spectra").split(".",3)[:3]))<=(0,3,1):
+    MOLECULES = [f for f in Moose.database_files if "J300" not in f]
+else:
+    MOLECULES = [f for f in Moose.get_database_files() if "J300" not in f]
+
 MOLECULE_DB_LABELS = {
     "C2_swan":"C₂ Swan",
     "CNBX": "CN (B-X)",
@@ -320,7 +326,7 @@ class molecule_module:
         allow_shift = self.mw.mol_wl_shift_check.isChecked()
         allow_stretch = self.mw.mol_wl_stretch_check.isChecked()
 
-        params=make_fit_params(y,dbs,Trot0,Tvib0, sigma, gamma,0,separate_Tvib, separate_Trot,True, allow_shift, allow_stretch)
+        params = make_fit_params(y,dbs,Trot0,Tvib0, sigma, gamma,0,separate_Tvib, separate_Trot,True, allow_shift, allow_stretch)
         worker = MooseFitWorker(label, x, y, params, dbs)
         # TODO: It seems that with QRunnable we don't need to store a ref; the pool by default takes ownership of the QRunnable.
         # self.mol_fit_workers.append(worker) # store ref to guard against gc
@@ -337,7 +343,7 @@ class molecule_module:
         label, ans, x_fit, y_fit = result
         self.fit_ready(label,ans,x_fit,y_fit)
 
-    def fit_ready(self, label, ans:"lmfit.minimizer.MinimizerResult", x_fit, y_fit):
+    def fit_ready(self, label, ans: "MinimizerResult", x_fit, y_fit):
         """Callback function that adds new results to the fit table and a plot of the fit to the plot widget.
         
         For each result, it adds a new row with the file name, and any `fraction` or `T_rot`/`T_vib` parameters.
