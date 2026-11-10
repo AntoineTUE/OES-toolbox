@@ -1,22 +1,15 @@
-import os
-import datetime
 import numpy as np
-from PyQt6.QtWidgets import  QFileDialog, QTreeWidgetItemIterator, \
-                                QTableWidgetItem, QMessageBox
+import scipy
 from PyQt6.QtCore import Qt
-from OES_toolbox.lazy_import import lazy_import
-from OES_toolbox.exporters import FileExport
-# from scipy import constants as const
-const = lazy_import("scipy.constants")
-scipy = lazy_import("scipy")
+from PyQt6.QtWidgets import QTableWidgetItem, QTreeWidgetItemIterator
 
 
 def black_body(x, T, A):
-    y = (1/x**4)*(1/(np.exp(const.h*const.c/(x*1e-9*const.k*T)) - 1))
+    y = (1/x**4)*(1/(np.exp(scipy.constants.h*scipy.constants.c/(x*1e-9*scipy.constants.k*T)) - 1))
     return A*y/np.sum(y)
 
 def black_body2(x, T, A, y0):
-    y = (1/x**4)*(1/(np.exp(const.h*const.c/(x*1e-9*const.k*T)) - 1))
+    y = (1/x**4)*(1/(np.exp(scipy.constants.h*scipy.constants.c/(x*1e-9*scipy.constants.k*T)) - 1))
     return A*y/np.sum(y) + y0      
 
 class cont_module():
@@ -34,11 +27,9 @@ class cont_module():
                 
         if self.mw.cont_medfilter_check.isChecked() or self.mw.cont_minfilter_check.isChecked():
             if self.mw.cont_minfilter_check.isChecked():
-                from scipy.ndimage import minimum_filter1d
-                y = minimum_filter1d(y, self.mw.cont_minfilter_num.value())
+                y = scipy.ndimage.minimum_filter1d(y, self.mw.cont_minfilter_num.value())
             if self.mw.cont_medfilter_check.isChecked():
-                from scipy.signal import medfilt
-                y = medfilt(y, self.mw.cont_medfilter_num.value())
+                y = scipy.signal.medfilt(y, self.mw.cont_medfilter_num.value())
             self.mw.plot(x, y, 'cont.: filtered ' + plot_item.name().replace('file:',''))
             self.mw.update_spec_colors()
             
